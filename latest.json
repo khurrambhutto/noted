@@ -1,15 +1,15 @@
 {
   "version": "0.1.2",
   "notes": "See the release notes for details.",
-  "pub_date": "2026-05-03T00:00:00Z",
+  "pub_date": "2026-05-03T16:13:43Z",
   "platforms": {
     "linux-x86_64": {
       "signature": "",
-      "url": "https://github.com/khurrambhutto/noted/releases/download/v0.1.1/noted_0.1.2_amd64.deb"
+      "url": "https://github.com/khurrambhutto/noted/releases/download/v0.1.2/noted_0.1.2_amd64.deb"
     },
     "windows-x86_64": {
       "signature": "",
-      "url": "https://github.com/khurrambhutto/noted/releases/download/v0.1.1/noted_0.1.2_x64_en-US.msi"
+      "url": "https://github.com/khurrambhutto/noted/releases/download/v0.1.2/noted_0.1.2_x64_en-US.msi"
     }
   }
 }
