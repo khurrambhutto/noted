@@ -384,6 +384,8 @@ updateBtn?.addEventListener('click', async () => {
         onEvent: new Channel(),
         rid: updateAvailable.rid
       });
+      const { relaunch } = window.__TAURI__.process;
+      await relaunch();
     } catch (err) {
       console.error('Update install failed:', err);
       updateBtn.textContent = 'Install failed';

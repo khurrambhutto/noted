@@ -93,6 +93,7 @@ fn save_theme_file(name: String, json: String, paths: tauri::State<'_, AppPaths>
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // Tauri resolves this to the correct per-user writable location on each OS.
