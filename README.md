@@ -9,13 +9,9 @@ A minimal, distraction-free note-taking app built with [Tauri](https://v2.tauri.
 - Custom themes compatible with Antinote JSON format
 - Lightweight — a single native window, no bloat
 
-## Keyboard Shortcuts
+## Navigation
 
-| Shortcut | Action |
-|----------|--------|
-| `⌘⇧]` / `Ctrl⇧]` | Next note |
-| `⌘⇧[` / `Ctrl⇧[` | Previous note |
-| `Esc` | Close settings |
+Swipe left or right with two fingers on the trackpad to move between notes. The active note indicator at the bottom shows your position in the stack.
 
 ## Install
 
