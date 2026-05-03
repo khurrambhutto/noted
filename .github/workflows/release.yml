@@ -85,6 +85,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm install
+
       - uses: actions/download-artifact@v4
 
       - name: Generate signatures and update manifest
