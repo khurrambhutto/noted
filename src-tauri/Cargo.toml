@@ -1,6 +1,6 @@
 [package]
 name = "noted"
-version = "0.1.1"
+version = "0.1.2"
 description = "A minimal, distraction-free note-taking app."
 authors = ["khurram bhutto"]
 edition = "2021"
