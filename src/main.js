@@ -469,10 +469,11 @@ window.addEventListener('DOMContentLoaded', () => {
 
   initPinState();
 
-  pinToggle?.addEventListener('click', (e) => {
-    e.stopPropagation();
+  // Click on the label (wraps text + switch) toggles pin
+  document.getElementById('pin-toggle')?.addEventListener('click', () => {
     togglePin();
   });
+  // Keyboard on the switch for accessibility
   pinToggle?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
