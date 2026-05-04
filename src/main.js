@@ -18,6 +18,9 @@ let saveTimeout = null;
 let animating = false;
 let themes = [];
 let activeTheme = null;
+let pinned = false;
+
+const PINS_STORAGE_KEY = 'noted.pinned';
 
 // ── DOM ──
 const canvas = document.getElementById('note-canvas');
@@ -28,6 +31,8 @@ const settingsPanel = document.getElementById('settings-panel');
 
 const importThemeButton = document.getElementById('btn-import-theme');
 const themeFileInput = document.getElementById('theme-file-input');
+// ── Pin Toggle ──
+const pinToggle = document.getElementById('btn-pin-toggle');
 // ── Custom Theme Dropdown ──
 const dropdownTrigger = document.getElementById('theme-dropdown-trigger');
 const dropdownPanel = document.getElementById('theme-dropdown-panel');
@@ -67,6 +72,42 @@ document.addEventListener('click', (e) => {
     closeDropdown();
   }
 });
+
+// ── Pin Toggle ──
+
+function getPinnedState() {
+  return localStorage.getItem(PINS_STORAGE_KEY) === 'true';
+}
+
+function setPinnedState(state) {
+  pinned = state;
+  localStorage.setItem(PINS_STORAGE_KEY, String(state));
+  pinToggle?.setAttribute('aria-checked', String(state));
+}
+
+async function togglePin() {
+  const newState = !pinned;
+  try {
+    await appWindow.setAlwaysOnTop(newState);
+    setPinnedState(newState);
+  } catch (err) {
+    console.error('Failed to toggle pin:', err);
+  }
+}
+
+async function initPinState() {
+  const stored = getPinnedState();
+  try {
+    const actual = await appWindow.isAlwaysOnTop();
+    // Sync: if stored says pinned but window isn't, apply it
+    if (stored && !actual) {
+      await appWindow.setAlwaysOnTop(true);
+    }
+    setPinnedState(stored || actual);
+  } catch {
+    setPinnedState(stored);
+  }
+}
 
 // ── Theme System (Antinote JSON compatible) ──
 
@@ -424,6 +465,19 @@ window.addEventListener('DOMContentLoaded', () => {
   themeFileInput?.addEventListener('change', (e) => {
     const [file] = e.target.files || [];
     if (file) importThemeFile(file);
+  });
+
+  initPinState();
+
+  pinToggle?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    togglePin();
+  });
+  pinToggle?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      togglePin();
+    }
   });
 
   document.getElementById('btn-minimize')?.addEventListener('mousedown', (e) => {
