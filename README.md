@@ -1,9 +1,11 @@
 <h1 align="center">noted</h1>
 
 
-![Preview 1](<Screenshot from 2026-05-04 17-37-31.png>)
-![Preview 2](<Screenshot from 2026-05-04 17-38-40.png>)
-![Preview 3](<Screenshot from 2026-05-04 17-39-27.png>)
+<p align="center">
+  <img src="Screenshot from 2026-05-04 17-37-31.png" width="32%" />
+  <img src="Screenshot from 2026-05-04 17-38-40.png" width="32%" />
+  <img src="Screenshot from 2026-05-04 17-39-27.png" width="32%" />
+</p>
 
 A minimal, distraction-free note-taking app built with [Tauri](https://v2.tauri.app/).
 
