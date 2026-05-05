@@ -6,6 +6,7 @@ import {
   setActiveThemeName,
   validateAntinoteTheme
 } from './themes.js';
+import { UndoManager } from './undo/undo-manager.js';
 
 const { invoke, Channel } = window.__TAURI__.core;
 const { getCurrentWindow } = window.__TAURI__.window;
@@ -18,16 +19,7 @@ let saveTimeout = null;
 let animating = false;
 let themes = [];
 let activeTheme = null;
-
-// ── Undo / Redo State ──
-const MAX_UNDO = 80;
-const IDLE_MS = 900;
-const undoStashes = new Map();       // noteId → { undo: Snapshot[], redo: Snapshot[] }
-let idleTimer = null;
-let lastSnapValue = null;            // skip redundant snapshots
-let needsSnapshot = true;            // snapshot on next beforeinput
-
-/** @typedef {{ v: string, s: number, e: number }} Snapshot */
+let undoManager = null;
 
 // ── DOM ──
 const canvas = document.getElementById('note-canvas');
@@ -200,74 +192,6 @@ function updateIndicator() {
   }
 }
 
-// ── Undo / Redo ──
-
-function stashOf(id) {
-  if (!undoStashes.has(id)) undoStashes.set(id, { undo: [], redo: [] });
-  return undoStashes.get(id);
-}
-
-function forgetUndo(id) {
-  undoStashes.delete(id);
-}
-
-/** Push current state. Only called when needsSnapshot is true (first edit after idle/switch/undo). */
-function pushSnapshot() {
-  const note = notes[currentIndex];
-  if (!note) return;
-  const val = canvas.value;
-  if (lastSnapValue === val) return;
-  const undo = stashOf(note.id).undo;
-  if (undo.length && undo[undo.length - 1].v === val) return;
-
-  undo.push({ v: val, s: canvas.selectionStart, e: canvas.selectionEnd });
-  if (undo.length > MAX_UNDO) undo.shift();
-  stashOf(note.id).redo.length = 0;
-  lastSnapValue = val;
-  needsSnapshot = false;
-}
-
-function performUndo() {
-  const note = notes[currentIndex];
-  if (!note) return;
-  const { undo, redo } = stashOf(note.id);
-  if (!undo.length) return;
-
-  redo.push({ v: canvas.value, s: canvas.selectionStart, e: canvas.selectionEnd });
-
-  const snap = undo.pop();
-  canvas.value = snap.v;
-  lastSnapValue = snap.v;
-  canvas.selectionStart = snap.s;
-  canvas.selectionEnd = snap.e;
-  needsSnapshot = true;
-}
-
-function performRedo() {
-  const note = notes[currentIndex];
-  if (!note) return;
-  const { undo, redo } = stashOf(note.id);
-  if (!redo.length) return;
-
-  undo.push({ v: canvas.value, s: canvas.selectionStart, e: canvas.selectionEnd });
-
-  const snap = redo.pop();
-  canvas.value = snap.v;
-  lastSnapValue = snap.v;
-  canvas.selectionStart = snap.s;
-  canvas.selectionEnd = snap.e;
-  needsSnapshot = true;
-}
-
-/** Restart the idle timer. When it fires, seal the current undo point. */
-function rescheduleIdle() {
-  clearTimeout(idleTimer);
-  idleTimer = setTimeout(() => {
-    pushSnapshot();
-    needsSnapshot = true;
-  }, IDLE_MS);
-}
-
 // ── Save ──
 
 function saveCurrentNote() {
@@ -281,17 +205,13 @@ function saveCurrentNote() {
 function scheduleSave() {
   if (saveTimeout) clearTimeout(saveTimeout);
   saveTimeout = setTimeout(() => saveCurrentNote(), 300);
-  rescheduleIdle();
+  undoManager.activity();
 }
 
 // ── Animation helper ──
 
 function prepareForNoteSwitch(newNoteId) {
-  pushSnapshot();
-  clearTimeout(idleTimer);
-  lastSnapValue = null;
-  needsSnapshot = true;
-  stashOf(newNoteId);
+  undoManager.onNoteSwitch(newNoteId);
 }
 
 function animateSwap(outClass, inClass, newContent) {
@@ -326,7 +246,7 @@ async function deleteIfEmpty() {
   const content = canvas.value.trim();
   if (content === '' && notes.length > 1) {
     const note = notes[currentIndex];
-    forgetUndo(note.id);
+    undoManager.forget(note.id);
     await invoke('delete_note', { id: note.id });
     notes.splice(currentIndex, 1);
     if (currentIndex >= notes.length) currentIndex = notes.length - 1;
@@ -429,17 +349,17 @@ document.addEventListener('keydown', (e) => {
   // Undo / Redo
   if (mod && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
     e.preventDefault();
-    performUndo();
+    undoManager.undo();
     return;
   }
   if (mod && e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
     e.preventDefault();
-    performRedo();
+    undoManager.redo();
     return;
   }
   if (mod && !e.shiftKey && (e.key === 'y' || e.key === 'Y')) {
     e.preventDefault();
-    performRedo();
+    undoManager.redo();
     return;
   }
 
@@ -513,12 +433,18 @@ updateBtn?.addEventListener('click', async () => {
 window.addEventListener('DOMContentLoaded', () => {
   initThemes();
   loadNotes();
-  canvas.addEventListener('input', scheduleSave);
 
-  // Undo: snapshot the pre-edit state before the first keystroke of a new edit
-  canvas.addEventListener('beforeinput', () => {
-    if (needsSnapshot) pushSnapshot();
+  undoManager = new UndoManager({
+    getValue:           () => canvas.value,
+    setValue:           (v) => { canvas.value = v; },
+    getSelectionStart:  () => canvas.selectionStart,
+    getSelectionEnd:    () => canvas.selectionEnd,
+    setSelection:       (s, e) => { canvas.selectionStart = s; canvas.selectionEnd = e; },
+    getNoteId:          () => notes[currentIndex]?.id ?? null
   });
+
+  canvas.addEventListener('input', scheduleSave);
+  canvas.addEventListener('beforeinput', () => undoManager.beforeInput());
 
   settingsButton?.addEventListener('mousedown', (e) => {
     e.stopPropagation();
