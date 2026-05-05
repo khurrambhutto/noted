@@ -19,6 +19,16 @@ let animating = false;
 let themes = [];
 let activeTheme = null;
 
+// ── Undo / Redo State ──
+const MAX_UNDO = 80;
+const IDLE_MS = 900;
+const undoStashes = new Map();       // noteId → { undo: Snapshot[], redo: Snapshot[] }
+let idleTimer = null;
+let lastSnapValue = null;            // skip redundant snapshots
+let needsSnapshot = true;            // snapshot on next beforeinput
+
+/** @typedef {{ v: string, s: number, e: number }} Snapshot */
+
 // ── DOM ──
 const canvas = document.getElementById('note-canvas');
 const container = document.getElementById('canvas-container');
@@ -190,6 +200,74 @@ function updateIndicator() {
   }
 }
 
+// ── Undo / Redo ──
+
+function stashOf(id) {
+  if (!undoStashes.has(id)) undoStashes.set(id, { undo: [], redo: [] });
+  return undoStashes.get(id);
+}
+
+function forgetUndo(id) {
+  undoStashes.delete(id);
+}
+
+/** Push current state. Only called when needsSnapshot is true (first edit after idle/switch/undo). */
+function pushSnapshot() {
+  const note = notes[currentIndex];
+  if (!note) return;
+  const val = canvas.value;
+  if (lastSnapValue === val) return;
+  const undo = stashOf(note.id).undo;
+  if (undo.length && undo[undo.length - 1].v === val) return;
+
+  undo.push({ v: val, s: canvas.selectionStart, e: canvas.selectionEnd });
+  if (undo.length > MAX_UNDO) undo.shift();
+  stashOf(note.id).redo.length = 0;
+  lastSnapValue = val;
+  needsSnapshot = false;
+}
+
+function performUndo() {
+  const note = notes[currentIndex];
+  if (!note) return;
+  const { undo, redo } = stashOf(note.id);
+  if (!undo.length) return;
+
+  redo.push({ v: canvas.value, s: canvas.selectionStart, e: canvas.selectionEnd });
+
+  const snap = undo.pop();
+  canvas.value = snap.v;
+  lastSnapValue = snap.v;
+  canvas.selectionStart = snap.s;
+  canvas.selectionEnd = snap.e;
+  needsSnapshot = true;
+}
+
+function performRedo() {
+  const note = notes[currentIndex];
+  if (!note) return;
+  const { undo, redo } = stashOf(note.id);
+  if (!redo.length) return;
+
+  undo.push({ v: canvas.value, s: canvas.selectionStart, e: canvas.selectionEnd });
+
+  const snap = redo.pop();
+  canvas.value = snap.v;
+  lastSnapValue = snap.v;
+  canvas.selectionStart = snap.s;
+  canvas.selectionEnd = snap.e;
+  needsSnapshot = true;
+}
+
+/** Restart the idle timer. When it fires, seal the current undo point. */
+function rescheduleIdle() {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    pushSnapshot();
+    needsSnapshot = true;
+  }, IDLE_MS);
+}
+
 // ── Save ──
 
 function saveCurrentNote() {
@@ -203,30 +281,34 @@ function saveCurrentNote() {
 function scheduleSave() {
   if (saveTimeout) clearTimeout(saveTimeout);
   saveTimeout = setTimeout(() => saveCurrentNote(), 300);
+  rescheduleIdle();
 }
 
 // ── Animation helper ──
+
+function prepareForNoteSwitch(newNoteId) {
+  pushSnapshot();
+  clearTimeout(idleTimer);
+  lastSnapValue = null;
+  needsSnapshot = true;
+  stashOf(newNoteId);
+}
 
 function animateSwap(outClass, inClass, newContent) {
   return new Promise((resolve) => {
     animating = true;
 
-    // Phase 1: slide out
     canvas.classList.add(outClass);
 
     setTimeout(() => {
-      // Swap content while invisible
       canvas.value = newContent;
       canvas.scrollTop = 0;
 
-      // Phase 2: slide in from opposite side
       canvas.classList.remove(outClass);
       canvas.classList.add(inClass);
 
-      // Force reflow so the browser registers the starting position
       canvas.offsetHeight;
 
-      // Remove the incoming class — transition animates to default (opacity 1, translate 0)
       canvas.classList.remove(inClass);
 
       setTimeout(() => {
@@ -244,9 +326,9 @@ async function deleteIfEmpty() {
   const content = canvas.value.trim();
   if (content === '' && notes.length > 1) {
     const note = notes[currentIndex];
+    forgetUndo(note.id);
     await invoke('delete_note', { id: note.id });
     notes.splice(currentIndex, 1);
-    // Clamp index
     if (currentIndex >= notes.length) currentIndex = notes.length - 1;
     return true;
   }
@@ -261,7 +343,6 @@ async function slideToNext() {
   const deleted = await deleteIfEmpty();
 
   if (deleted) {
-    // Deleted current empty note — just show whatever is now at currentIndex
     await animateSwap('slide-left-out', 'slide-left-in', notes[currentIndex].content);
     updateIndicator();
     return;
@@ -271,10 +352,12 @@ async function slideToNext() {
     saveCurrentNote();
     const newNote = await invoke('create_note');
     notes.push(newNote);
+    prepareForNoteSwitch(newNote.id);
     currentIndex = notes.length - 1;
     await animateSwap('slide-left-out', 'slide-left-in', '');
   } else {
     saveCurrentNote();
+    prepareForNoteSwitch(notes[currentIndex + 1].id);
     currentIndex++;
     await animateSwap('slide-left-out', 'slide-left-in', notes[currentIndex].content);
   }
@@ -288,13 +371,13 @@ async function slideToPrev() {
   const deleted = await deleteIfEmpty();
 
   if (deleted) {
-    // Index already shifted left by splice — show current
     await animateSwap('slide-right-out', 'slide-right-in', notes[currentIndex].content);
     updateIndicator();
     return;
   }
 
   saveCurrentNote();
+  prepareForNoteSwitch(notes[currentIndex - 1].id);
   currentIndex--;
   await animateSwap('slide-right-out', 'slide-right-in', notes[currentIndex].content);
   updateIndicator();
@@ -309,8 +392,6 @@ const SWIPE_THRESHOLD = 80;
 const GESTURE_TIMEOUT = 200;
 
 container.addEventListener('wheel', (e) => {
-  // Let normal two-finger vertical scrolling work inside the textarea.
-  // Only capture horizontal-dominant gestures for note navigation.
   if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
 
   e.preventDefault();
@@ -343,9 +424,28 @@ container.addEventListener('wheel', (e) => {
 // ── Keyboard shortcuts ──
 
 document.addEventListener('keydown', (e) => {
+  const mod = e.metaKey || e.ctrlKey;
+
+  // Undo / Redo
+  if (mod && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+    e.preventDefault();
+    performUndo();
+    return;
+  }
+  if (mod && e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+    e.preventDefault();
+    performRedo();
+    return;
+  }
+  if (mod && !e.shiftKey && (e.key === 'y' || e.key === 'Y')) {
+    e.preventDefault();
+    performRedo();
+    return;
+  }
+
   if (e.key === 'Escape') toggleSettings(false);
 
-  if ((e.metaKey || e.ctrlKey) && e.shiftKey) {
+  if (mod && e.shiftKey) {
     if (e.key === ']') { e.preventDefault(); slideToNext(); }
     if (e.key === '[') { e.preventDefault(); slideToPrev(); }
   }
@@ -414,6 +514,11 @@ window.addEventListener('DOMContentLoaded', () => {
   initThemes();
   loadNotes();
   canvas.addEventListener('input', scheduleSave);
+
+  // Undo: snapshot the pre-edit state before the first keystroke of a new edit
+  canvas.addEventListener('beforeinput', () => {
+    if (needsSnapshot) pushSnapshot();
+  });
 
   settingsButton?.addEventListener('mousedown', (e) => {
     e.stopPropagation();
