@@ -295,6 +295,7 @@ html, body {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   padding: 32px;
   color: var(--theme-type-main);
   animation: settings-in 0.2s ease-out;
@@ -621,4 +622,121 @@ html, body {
 .settings-update-version {
   color: var(--theme-type-light);
   font: 500 11px/1 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ── Shortcut Section ── */
+
+.shortcut-section-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 0 10px;
+  border: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--theme-type-main) 8%, transparent);
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+  -webkit-app-region: no-drag;
+}
+
+.shortcut-section-trigger:hover {
+  border-bottom-color: color-mix(in srgb, var(--theme-type-main) 16%, transparent);
+}
+
+.shortcut-section-trigger:focus-visible {
+  border-bottom-color: var(--theme-accent-main);
+  box-shadow: 0 1px 0 var(--theme-accent-main);
+}
+
+.shortcut-section-trigger .settings-section-title {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+.shortcut-chevron {
+  flex-shrink: 0;
+  color: var(--theme-type-subtle-plus);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.shortcut-section-trigger[aria-expanded="true"] .shortcut-chevron {
+  transform: rotate(180deg);
+}
+
+.shortcut-body {
+  animation: shortcut-body-in 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes shortcut-body-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.shortcut-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px 0 10px;
+}
+
+.shortcut-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--theme-type-main) 18%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--theme-background) 88%, var(--theme-type-reverse) 12%);
+  color: var(--theme-type-main);
+  font: 600 12px/1 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif;
+  box-shadow: 0 1.5px 0 color-mix(in srgb, var(--theme-type-main) 10%, transparent), 0 0 0 0.5px color-mix(in srgb, var(--theme-type-reverse) 30%, transparent) inset;
+  letter-spacing: 0.01em;
+}
+
+.shortcut-plus {
+  color: var(--theme-type-subtle-plus);
+  font: 500 13px/1 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.shortcut-steps {
+  margin: 0;
+  padding: 0 0 0 20px;
+  color: var(--theme-type-subtle-plus);
+  font: 400 11px/1.8 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.shortcut-steps strong {
+  color: var(--theme-type-main);
+  font-weight: 600;
+}
+
+.shortcut-steps kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid color-mix(in srgb, var(--theme-type-main) 18%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--theme-background) 92%, var(--theme-type-reverse) 8%);
+  color: var(--theme-type-main);
+  font: 600 10px/1.4 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--theme-type-main) 8%, transparent);
+}
+
+code {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--theme-type-main) 8%, transparent);
+  color: var(--theme-type-main);
+  font: 500 11px/1.4 'SF Mono', 'SFMono-Regular', ui-monospace, 'Menlo', monospace;
 }

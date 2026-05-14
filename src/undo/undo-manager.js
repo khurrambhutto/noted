@@ -1,10 +1,10 @@
 /**
  * Undo/redo manager for textarea content.
  *
- * Uses an idle-snapshot strategy: on the first "beforeinput" event after an
- * idle pause, undo, redo, or note switch, the current state is pushed to the
- * undo stack BEFORE the edit occurs.  The undo group is sealed after
- * `idleMs` ms of inactivity.
+ * Uses editor-style undo stops: on the first `beforeinput` event in a change
+ * group, the pre-edit state is pushed to the undo stack. The group is sealed
+ * after `idleMs` ms of inactivity, by undo/redo, by a note switch, or
+ * immediately after atomic edits such as paste/drop.
  *
  * ## Usage
  *
@@ -18,7 +18,7 @@
  *   getNoteId:         () => currentNote?.id ?? null,
  * });
  *
- * textarea.addEventListener('beforeinput', () => mgr.beforeInput());
+ * textarea.addEventListener('beforeinput', (e) => mgr.beforeInput(e));
  * textarea.addEventListener('input',      () => mgr.activity());
  *
  * document.addEventListener('keydown', (e) => {
@@ -56,18 +56,28 @@ export class UndoManager {
     /** @type {Map<number, { undo: Snapshot[], redo: Snapshot[] }>} */
     this.#stashes = new Map();
     this.#idleTimer = null;
-    this.#lastSnapValue = null;
-    this.#needsSnapshot = true;
+    this.#groupOpen = false;
+    this.#lastInputType = null;
+    this.#closeAfterInput = false;
   }
 
   // ── Public API ──
 
   /**
    * Call on `beforeinput`.
-   * Pushes a pre-edit snapshot if a new undo group should start.
+   * Pushes a pre-edit snapshot when a new undo group should start.
+   *
+   * @param {InputEvent} [event]
    */
-  beforeInput() {
-    if (this.#needsSnapshot) this.#push();
+  beforeInput(event) {
+    const inputType = event?.inputType || 'unknown';
+    const startsNewGroup = !this.#groupOpen || this.#isBoundaryInput(inputType);
+
+    if (startsNewGroup) this.#pushUndoStop();
+
+    this.#groupOpen = true;
+    this.#lastInputType = inputType;
+    this.#closeAfterInput = this.#isAtomicInput(inputType);
   }
 
   /**
@@ -76,9 +86,13 @@ export class UndoManager {
    */
   activity() {
     clearTimeout(this.#idleTimer);
+    if (this.#closeAfterInput) {
+      this.#closeGroup();
+      return;
+    }
+
     this.#idleTimer = setTimeout(() => {
-      this.#push();
-      this.#needsSnapshot = true;
+      this.#closeGroup();
     }, this.#idleMs);
   }
 
@@ -89,10 +103,7 @@ export class UndoManager {
    * @param {number} newNoteId
    */
   onNoteSwitch(newNoteId) {
-    this.#push();
-    clearTimeout(this.#idleTimer);
-    this.#lastSnapValue = null;
-    this.#needsSnapshot = true;
+    this.#closeGroup();
     this.#stashOf(newNoteId); // ensure stash exists
   }
 
@@ -116,13 +127,13 @@ export class UndoManager {
     const { undo, redo } = this.#stashOf(noteId);
     if (undo.length === 0) return false;
 
+    this.#closeGroup();
+
     // Save current state to redo before restoring
-    redo.push(this.#read());
+    this.#pushSnapshot(redo, this.#read());
 
     const snap = /** @type {Snapshot} */ (undo.pop());
     this.#write(snap);
-    this.#lastSnapValue = snap.v;
-    this.#needsSnapshot = true;
     return true;
   }
 
@@ -137,13 +148,13 @@ export class UndoManager {
     const { undo, redo } = this.#stashOf(noteId);
     if (redo.length === 0) return false;
 
+    this.#closeGroup();
+
     // Save current state to undo before restoring
-    undo.push(this.#read());
+    this.#pushSnapshot(undo, this.#read());
 
     const snap = /** @type {Snapshot} */ (redo.pop());
     this.#write(snap);
-    this.#lastSnapValue = snap.v;
-    this.#needsSnapshot = true;
     return true;
   }
 
@@ -172,11 +183,14 @@ export class UndoManager {
   /** @type {ReturnType<typeof setTimeout> | null} */
   #idleTimer;
 
+  /** @type {boolean} */
+  #groupOpen;
+
   /** @type {string | null} */
-  #lastSnapValue;
+  #lastInputType;
 
   /** @type {boolean} */
-  #needsSnapshot;
+  #closeAfterInput;
 
   /**
    * Read the current canvas state as a Snapshot.
@@ -200,31 +214,68 @@ export class UndoManager {
   }
 
   /**
-   * Push the current state onto the undo stack and clear the redo stack.
-   * Skips if the value hasn't changed since last snapshot.
+   * Push the current state as an undo stop and clear the redo stack.
    */
-  #push() {
+  #pushUndoStop() {
     const noteId = this.#source.getNoteId();
     if (noteId == null) return;
 
-    const { v, s, e } = this.#read();
+    const { undo, redo } = this.#stashOf(noteId);
+    this.#pushSnapshot(undo, this.#read());
+    redo.length = 0;
+  }
 
-    // Skip if the value is identical to the last snapshot
-    if (this.#lastSnapValue === v) return;
+  /**
+   * Push a snapshot onto a history stack, avoiding consecutive duplicates.
+   * @param {Snapshot[]} stack
+   * @param {Snapshot} snap
+   */
+  #pushSnapshot(stack, snap) {
+    if (stack.length > 0 && stack[stack.length - 1].v === snap.v) return;
 
-    const undo = this.#stashOf(noteId).undo;
+    stack.push(snap);
+    if (stack.length > this.#maxUndo) stack.shift();
+  }
 
-    // Skip if the last entry already has this value (prevents consecutive dupes)
-    if (undo.length > 0 && undo[undo.length - 1].v === v) return;
+  #closeGroup() {
+    clearTimeout(this.#idleTimer);
+    this.#idleTimer = null;
+    this.#groupOpen = false;
+    this.#lastInputType = null;
+    this.#closeAfterInput = false;
+  }
 
-    undo.push({ v, s, e });
-    if (undo.length > this.#maxUndo) undo.shift();
+  /**
+   * A different edit kind should start a new undo group while another group is
+   * open. This mirrors the transaction-boundary behavior users expect from
+   * editors: typing can coalesce, but a delete, line break, or paste gets its
+   * own undo stop.
+   * @param {string} inputType
+   * @returns {boolean}
+   */
+  #isBoundaryInput(inputType) {
+    if (this.#lastInputType == null || inputType === this.#lastInputType) return false;
+    if (this.#isTypingInput(inputType) && this.#isTypingInput(this.#lastInputType)) return false;
+    return true;
+  }
 
-    // Clear redo — new edit invalidates redo history
-    this.#stashOf(noteId).redo.length = 0;
+  /**
+   * @param {string} inputType
+   * @returns {boolean}
+   */
+  #isTypingInput(inputType) {
+    return inputType === 'insertText' || inputType === 'insertCompositionText';
+  }
 
-    this.#lastSnapValue = v;
-    this.#needsSnapshot = false;
+  /**
+   * @param {string} inputType
+   * @returns {boolean}
+   */
+  #isAtomicInput(inputType) {
+    return inputType === 'insertFromPaste'
+      || inputType === 'insertFromDrop'
+      || inputType === 'insertReplacementText'
+      || inputType === 'insertFromYank';
   }
 
   /**

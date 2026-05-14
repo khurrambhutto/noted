@@ -60,10 +60,32 @@
             </div>
             <input id="theme-file-input" type="file" accept=".json,application/json"hidden />
           </div>
+          <div class="settings-section">
+            <button class="shortcut-section-trigger" id="shortcut-trigger" aria-expanded="false">
+              <h3 class="settings-section-title">Global Shortcut</h3>
+              <svg class="shortcut-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" aria-hidden="true">
+                <path d="M1 1.5L5 5.5L9 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div class="shortcut-body" id="shortcut-body" hidden>
+              <div class="shortcut-display">
+                <kbd class="shortcut-key">Super</kbd>
+                <span class="shortcut-plus">+</span>
+                <kbd class="shortcut-key">N</kbd>
+              </div>
+              <ol class="shortcut-steps">
+                <li>Open <strong>Settings → Keyboard → Custom Shortcuts</strong></li>
+                <li>Click <strong>+ Add Shortcut</strong></li>
+                <li>Set <strong>Name</strong> to <code>Noted Toggle</code></li>
+                <li>Set <strong>Command</strong> to <code>noted</code></li>
+                <li>Set <strong>Shortcut</strong> to <kbd>Super</kbd>+<kbd>N</kbd></li>
+              </ol>
+            </div>
+          </div>
         </div>
         <div class="settings-update-row" id="update-row">
           <button class="settings-update-btn" id="update-btn">Check for Updates</button>
-          <span class="settings-update-version" id="update-version">v0.1.4</span>
+          <span class="settings-update-version" id="update-version">v0.1.6</span>
         </div>
       </aside>
     </div>

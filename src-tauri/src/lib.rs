@@ -91,14 +91,27 @@ fn save_theme_file(name: String, json: String, paths: tauri::State<'_, AppPaths>
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                if window.is_visible().unwrap_or(false) {
+                    let _ = window.hide();
+                } else {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
+        }));
+    }
+
+    builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
-            // Tauri resolves this to the correct per-user writable location on each OS.
-            // Windows: %APPDATA%\\com.khurram.noted\\
-            // Linux:   ~/.local/share/com.khurram.noted/ or the distro's XDG data dir
             let app_data_dir = app.path().app_data_dir().expect("failed to get app data dir");
             fs::create_dir_all(&app_data_dir).expect("failed to create app data dir");
 

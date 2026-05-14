@@ -70,6 +70,35 @@ document.addEventListener('click', (e) => {
   }
 });
 
+// ── Shortcut Disclosure ──
+
+const shortcutTrigger = document.getElementById('shortcut-trigger');
+const shortcutBody = document.getElementById('shortcut-body');
+let shortcutOpen = true;
+
+function toggleShortcut(force) {
+  shortcutOpen = typeof force === 'boolean' ? force : !shortcutOpen;
+  shortcutTrigger.setAttribute('aria-expanded', String(shortcutOpen));
+  shortcutBody.hidden = !shortcutOpen;
+}
+
+toggleShortcut(false);
+
+shortcutTrigger?.addEventListener('click', () => {
+  toggleShortcut();
+});
+
+shortcutTrigger?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    toggleShortcut();
+  }
+  if (e.key === 'Escape' && shortcutOpen) {
+    toggleShortcut(false);
+    shortcutTrigger.focus();
+  }
+});
+
 // ── Theme System (Antinote JSON compatible) ──
 
 async function initThemes() {
@@ -349,17 +378,17 @@ document.addEventListener('keydown', (e) => {
   // Undo / Redo
   if (mod && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
     e.preventDefault();
-    undoManager.undo();
+    if (undoManager.undo()) saveCurrentNote();
     return;
   }
   if (mod && e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
     e.preventDefault();
-    undoManager.redo();
+    if (undoManager.redo()) saveCurrentNote();
     return;
   }
   if (mod && !e.shiftKey && (e.key === 'y' || e.key === 'Y')) {
     e.preventDefault();
-    undoManager.redo();
+    if (undoManager.redo()) saveCurrentNote();
     return;
   }
 
@@ -444,7 +473,7 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   canvas.addEventListener('input', scheduleSave);
-  canvas.addEventListener('beforeinput', () => undoManager.beforeInput());
+  canvas.addEventListener('beforeinput', (e) => undoManager.beforeInput(e));
 
   settingsButton?.addEventListener('mousedown', (e) => {
     e.stopPropagation();

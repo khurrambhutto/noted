@@ -20,6 +20,16 @@ A minimal, distraction-free note-taking app built with [Tauri](https://v2.tauri.
 
 Swipe left or right with two fingers on the trackpad to move between notes. The active note indicator at the bottom shows your position in the stack.
 
+## Global Shortcut (Linux)
+
+Press **Super+N** to toggle the window from anywhere.
+
+1. Open **Settings → Keyboard → Custom Shortcuts**
+2. Click **+ Add Shortcut**
+3. Set **Name** to `Noted Toggle`
+4. Set **Command** to `noted`
+5. Set **Shortcut** to **Super+N**
+
 ## Install
 
 ### Linux
