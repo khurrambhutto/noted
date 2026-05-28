@@ -1,585 +1,110 @@
-import {
-  applyTheme,
-  getActiveThemeName,
-  getThemeLoadWarnings,
-  loadThemes,
-  saveImportedTheme,
-  setActiveThemeName,
-  validateAntinoteTheme
-} from './themes.js';
+import { bindKeyboardShortcuts } from './keyboard-shortcuts.js';
+import { createNavigation } from './navigation.js';
+import { createNotesController } from './notes-controller.js';
+import { createSettingsUi } from './settings-ui.js';
+import { createStatusController } from './status-ui.js';
+import { createThemeUi } from './theme-ui.js';
 import { UndoManager } from './undo/undo-manager.js';
+import { createUpdaterUi } from './updater-ui.js';
+import { createWindowControls } from './window-controls.js';
 
 const { invoke, Channel } = window.__TAURI__.core;
 const { getCurrentWindow } = window.__TAURI__.window;
 const appWindow = getCurrentWindow();
 
-// ── State ──
-let notes = [];
-let currentIndex = 0;
-let saveTimeout = null;
-let pendingSave = Promise.resolve();
-let animating = false;
-let themes = [];
-let activeTheme = null;
-let undoManager = null;
-
-// ── DOM ──
 const canvas = document.getElementById('note-canvas');
 const container = document.getElementById('canvas-container');
 const indicator = document.getElementById('note-indicator');
 const settingsButton = document.getElementById('btn-settings');
 const settingsPanel = document.getElementById('settings-panel');
 const appStatus = document.getElementById('app-status');
-
+const shortcutTrigger = document.getElementById('shortcut-trigger');
+const shortcutBody = document.getElementById('shortcut-body');
 const importThemeButton = document.getElementById('btn-import-theme');
 const themeFileInput = document.getElementById('theme-file-input');
-// ── Custom Theme Dropdown ──
 const dropdownTrigger = document.getElementById('theme-dropdown-trigger');
 const dropdownPanel = document.getElementById('theme-dropdown-panel');
 const dropdownLabel = document.getElementById('theme-dropdown-label');
-let dropdownOpen = false;
-let statusTimeout = null;
-let closingAfterSave = false;
-
-function showStatus(message) {
-  if (!appStatus) return;
-  if (statusTimeout) clearTimeout(statusTimeout);
-  appStatus.textContent = message;
-  appStatus.classList.add('visible');
-  statusTimeout = setTimeout(() => {
-    appStatus.classList.remove('visible');
-  }, 3200);
-}
-
-function closeDropdown() {
-  dropdownOpen = false;
-  dropdownTrigger.setAttribute('aria-expanded', 'false');
-  dropdownPanel.hidden = true;
-}
-
-function toggleDropdown() {
-  dropdownOpen = !dropdownOpen;
-  dropdownTrigger.setAttribute('aria-expanded', String(dropdownOpen));
-  dropdownPanel.hidden = !dropdownOpen;
-}
-
-dropdownTrigger?.addEventListener('click', (e) => {
-  e.stopPropagation();
-  toggleDropdown();
-});
-
-dropdownTrigger?.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' || e.key === ' ') {
-    e.preventDefault();
-    toggleDropdown();
-  }
-  if (e.key === 'Escape' && dropdownOpen) {
-    closeDropdown();
-    dropdownTrigger.focus();
-  }
-});
-
-document.addEventListener('click', (e) => {
-  if (dropdownOpen && !e.target.closest('.theme-dropdown')) {
-    closeDropdown();
-  }
-});
-
-// ── Shortcut Disclosure ──
-
-const shortcutTrigger = document.getElementById('shortcut-trigger');
-const shortcutBody = document.getElementById('shortcut-body');
-let shortcutOpen = true;
-
-function toggleShortcut(force) {
-  shortcutOpen = typeof force === 'boolean' ? force : !shortcutOpen;
-  shortcutTrigger.setAttribute('aria-expanded', String(shortcutOpen));
-  shortcutBody.hidden = !shortcutOpen;
-}
-
-toggleShortcut(false);
-
-shortcutTrigger?.addEventListener('click', () => {
-  toggleShortcut();
-});
-
-shortcutTrigger?.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' || e.key === ' ') {
-    e.preventDefault();
-    toggleShortcut();
-  }
-  if (e.key === 'Escape' && shortcutOpen) {
-    toggleShortcut(false);
-    shortcutTrigger.focus();
-  }
-});
-
-// ── Theme System (Antinote JSON compatible) ──
-
-async function initThemes() {
-  themes = await loadThemes();
-  const preferredName = getActiveThemeName();
-  activeTheme = themes.find((theme) => theme.name === preferredName) || themes[0];
-  applyTheme(activeTheme);
-  renderThemeSelect();
-
-  const warnings = getThemeLoadWarnings();
-  if (warnings.length > 0) {
-    showStatus(warnings.length === 1 ? warnings[0] : `Skipped ${warnings.length} invalid themes`);
-  }
-}
-
-function renderThemeSelect() {
-  dropdownLabel.textContent = activeTheme.name;
-  dropdownPanel.innerHTML = themes
-    .map((theme) => {
-      const selected = theme.name === activeTheme.name;
-      const checkSvg = `<svg class="theme-option-check-icon" width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6L5 9L10 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-      const swatches = `<span class="theme-option-swatches" aria-hidden="true">
-        <span class="theme-swatch" style="--swatch-color: ${escapeHtml(theme.background)}"></span>
-        <span class="theme-swatch" style="--swatch-color: ${escapeHtml(theme.typeMain)}"></span>
-        <span class="theme-swatch theme-swatch-accent" style="--swatch-color: ${escapeHtml(theme.accent1Main)}"></span>
-      </span>`;
-      return `<button class="theme-dropdown-option" role="option" aria-selected="${selected}" data-value="${escapeHtml(theme.name)}">
-        <span class="theme-option-check">${selected ? checkSvg : ''}</span>
-        ${swatches}
-        <span class="theme-option-label">${escapeHtml(theme.name)}</span>
-      </button>`;
-    })
-    .join('');
-  dropdownPanel.querySelectorAll('.theme-dropdown-option').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      setThemeByName(btn.dataset.value);
-      closeDropdown();
-      dropdownTrigger.focus();
-    });
-  });
-}
-
-function setThemeByName(name) {
-  const theme = themes.find((item) => item.name === name);
-  if (!theme) return;
-  activeTheme = theme;
-  applyTheme(theme);
-  setActiveThemeName(theme.name);
-  renderThemeSelect();
-}
-
-async function importThemeFile(file) {
-  try {
-    const raw = await file.text();
-    const imported = validateAntinoteTheme(JSON.parse(raw));
-    const existingIndex = themes.findIndex((theme) => theme.name === imported.name);
-
-    if (existingIndex >= 0) {
-      themes[existingIndex] = imported;
-    } else {
-      themes.push(imported);
-    }
-
-    await saveImportedTheme(imported);
-    setThemeByName(imported.name);
-    showStatus(`Imported ${imported.name}`);
-  } catch (error) {
-    console.error(error);
-    showStatus('Theme import failed');
-  } finally {
-    themeFileInput.value = '';
-  }
-}
-
-function toggleSettings(forceOpen) {
-  const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : settingsPanel.classList.contains('hidden');
-  settingsPanel.classList.toggle('hidden', !shouldOpen);
-  settingsPanel.setAttribute('aria-hidden', String(!shouldOpen));
-  settingsButton.classList.toggle('open', shouldOpen);
-  document.documentElement.dataset.settings = shouldOpen ? 'open' : '';
-}
-
-function escapeHtml(value) {
-  return String(value).replace(/[&<>"'`]/g, (char) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-    '`': '&#x60;'
-  }[char]));
-}
-
-// ── Load & Render ──
-
-async function loadNotes() {
-  notes = await invoke('list_notes');
-  if (notes.length === 0) {
-    const note = await invoke('create_note');
-    notes = [note];
-  }
-  currentIndex = 0;
-  renderCurrentNote(false);
-}
-
-function renderCurrentNote(animate) {
-  if (animate) return; // animated transitions handle their own rendering
-  canvas.value = notes[currentIndex]?.content || '';
-  updateIndicator();
-}
-
-function updateIndicator() {
-  if (notes.length <= 1) {
-    indicator.classList.remove('visible');
-    indicator.innerHTML = '';
-    return;
-  }
-
-  indicator.classList.add('visible');
-
-  if (notes.length <= 12) {
-    let html = '';
-    for (let i = 0; i < notes.length; i++) {
-      html += `<div class="dot${i === currentIndex ? ' active' : ''}"></div>`;
-    }
-    indicator.innerHTML = html;
-  } else {
-    indicator.innerHTML = `<span class="note-count">${currentIndex + 1} / ${notes.length}</span>`;
-  }
-}
-
-// ── Save ──
-
-async function saveCurrentNote() {
-  if (saveTimeout) {
-    clearTimeout(saveTimeout);
-    saveTimeout = null;
-  }
-
-  const note = notes[currentIndex];
-  if (!note) return pendingSave;
-
-  const content = canvas.value;
-  const noteIndex = currentIndex;
-  notes[noteIndex].content = content;
-
-  pendingSave = pendingSave
-    .catch(() => {})
-    .then(() => invoke('save_note', { id: note.id, content }))
-    .catch((error) => {
-      console.error('Save failed:', error);
-      showStatus('Save failed');
-      throw error;
-    });
-
-  return pendingSave;
-}
-
-function scheduleSave() {
-  if (saveTimeout) clearTimeout(saveTimeout);
-  saveTimeout = setTimeout(() => {
-    saveCurrentNote().catch(() => {});
-  }, 300);
-  undoManager.activity();
-}
-
-async function flushPendingSave() {
-  if (saveTimeout) {
-    await saveCurrentNote();
-    return;
-  }
-
-  await pendingSave;
-}
-
-async function closeAfterFlushingSave() {
-  if (closingAfterSave) return;
-  closingAfterSave = true;
-  try {
-    await flushPendingSave();
-  } catch (error) {
-    console.error('Save before close failed:', error);
-    showStatus('Save failed');
-    closingAfterSave = false;
-    return;
-  }
-
-  await appWindow.close();
-}
-
-// ── Animation helper ──
-
-function prepareForNoteSwitch(newNoteId) {
-  undoManager.onNoteSwitch(newNoteId);
-}
-
-function animateSwap(outClass, inClass, newContent) {
-  return new Promise((resolve) => {
-    animating = true;
-
-    canvas.classList.add(outClass);
-
-    setTimeout(() => {
-      canvas.value = newContent;
-      canvas.scrollTop = 0;
-
-      canvas.classList.remove(outClass);
-      canvas.classList.add(inClass);
-
-      canvas.offsetHeight;
-
-      canvas.classList.remove(inClass);
-
-      setTimeout(() => {
-        animating = false;
-        canvas.focus();
-        resolve();
-      }, 200);
-    }, 150);
-  });
-}
-
-// ── Delete empty note helper ──
-
-async function deleteIfEmpty() {
-  const content = canvas.value.trim();
-  if (content === '' && notes.length > 1) {
-    await flushPendingSave();
-    const note = notes[currentIndex];
-    undoManager.forget(note.id);
-    await invoke('delete_note', { id: note.id });
-    notes.splice(currentIndex, 1);
-    if (currentIndex >= notes.length) currentIndex = notes.length - 1;
-    return true;
-  }
-  return false;
-}
-
-// ── Slide ──
-
-async function slideToNext() {
-  if (animating) return;
-
-  const deleted = await deleteIfEmpty();
-
-  if (deleted) {
-    await animateSwap('slide-left-out', 'slide-left-in', notes[currentIndex].content);
-    updateIndicator();
-    return;
-  }
-
-  if (currentIndex >= notes.length - 1) {
-    await saveCurrentNote();
-    const newNote = await invoke('create_note');
-    notes.push(newNote);
-    prepareForNoteSwitch(newNote.id);
-    currentIndex = notes.length - 1;
-    await animateSwap('slide-left-out', 'slide-left-in', '');
-  } else {
-    await saveCurrentNote();
-    prepareForNoteSwitch(notes[currentIndex + 1].id);
-    currentIndex++;
-    await animateSwap('slide-left-out', 'slide-left-in', notes[currentIndex].content);
-  }
-
-  updateIndicator();
-}
-
-async function slideToPrev() {
-  if (animating || currentIndex <= 0) return;
-
-  const deleted = await deleteIfEmpty();
-
-  if (deleted) {
-    await animateSwap('slide-right-out', 'slide-right-in', notes[currentIndex].content);
-    updateIndicator();
-    return;
-  }
-
-  await saveCurrentNote();
-  prepareForNoteSwitch(notes[currentIndex - 1].id);
-  currentIndex--;
-  await animateSwap('slide-right-out', 'slide-right-in', notes[currentIndex].content);
-  updateIndicator();
-}
-
-// ── Swipe Gesture (trackpad two-finger) ──
-
-let accumulatedX = 0;
-let gestureTimer = null;
-let gestureLocked = false;
-const SWIPE_THRESHOLD = 80;
-const GESTURE_TIMEOUT = 200;
-
-container.addEventListener('wheel', (e) => {
-  if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
-
-  e.preventDefault();
-
-  if (gestureLocked || animating) return;
-
-  accumulatedX += e.deltaX;
-
-  if (gestureTimer) clearTimeout(gestureTimer);
-  gestureTimer = setTimeout(() => {
-    accumulatedX = 0;
-    gestureLocked = false;
-  }, GESTURE_TIMEOUT);
-
-  if (Math.abs(accumulatedX) >= SWIPE_THRESHOLD) {
-    gestureLocked = true;
-    if (accumulatedX > 0) {
-      slideToNext();
-    } else {
-      slideToPrev();
-    }
-    accumulatedX = 0;
-
-    setTimeout(() => {
-      gestureLocked = false;
-    }, 400);
-  }
-}, { passive: false });
-
-// ── Keyboard shortcuts ──
-
-document.addEventListener('keydown', (e) => {
-  const mod = e.metaKey || e.ctrlKey;
-
-  // Undo / Redo
-  if (mod && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
-    e.preventDefault();
-    if (undoManager.undo()) saveCurrentNote().catch(() => {});
-    return;
-  }
-  if (mod && e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
-    e.preventDefault();
-    if (undoManager.redo()) saveCurrentNote().catch(() => {});
-    return;
-  }
-  if (mod && !e.shiftKey && (e.key === 'y' || e.key === 'Y')) {
-    e.preventDefault();
-    if (undoManager.redo()) saveCurrentNote().catch(() => {});
-    return;
-  }
-
-  if (e.key === 'Escape') toggleSettings(false);
-
-  if (mod && e.shiftKey) {
-    if (e.key === ']') { e.preventDefault(); slideToNext(); }
-    if (e.key === '[') { e.preventDefault(); slideToPrev(); }
-  }
-});
-
-// ── Updater ──
-
 const updateBtn = document.getElementById('update-btn');
 const updateVersion = document.getElementById('update-version');
-let updateAvailable = null;
-
-async function checkForUpdates() {
-  try {
-    const metadata = await invoke('plugin:updater|check');
-
-    if (metadata) {
-      updateAvailable = metadata;
-      updateBtn.textContent = 'Install Update';
-      updateBtn.classList.add('install');
-      updateVersion.textContent = metadata.version ? `v${metadata.version}` : 'v0.1.7';
-    } else {
-      updateAvailable = null;
-      updateBtn.textContent = 'Up to date';
-      updateBtn.classList.remove('install');
-      updateBtn.disabled = true;
-      setTimeout(() => {
-        updateBtn.textContent = 'Check for Updates';
-        updateBtn.disabled = false;
-      }, 3000);
-    }
-  } catch (err) {
-    console.error('Update check failed:', err);
-    updateBtn.textContent = 'Could not check';
-    updateBtn.disabled = true;
-    setTimeout(() => {
-      updateBtn.textContent = 'Check for Updates';
-      updateBtn.disabled = false;
-    }, 3000);
-  }
-}
-
-updateBtn?.addEventListener('click', async () => {
-  if (updateAvailable) {
-    try {
-      updateBtn.textContent = 'Installing…';
-      updateBtn.disabled = true;
-      await invoke('plugin:updater|download_and_install', {
-        onEvent: new Channel(),
-        rid: updateAvailable.rid
-      });
-      await invoke('plugin:process|restart');
-    } catch (err) {
-      console.error('Update install failed:', err);
-      updateBtn.textContent = 'Install failed';
-      updateBtn.disabled = false;
-      updateBtn.classList.remove('install');
-      updateAvailable = null;
-    }
-  } else {
-    checkForUpdates();
-  }
-});
-
-// ── Init ──
 
 window.addEventListener('DOMContentLoaded', async () => {
-  undoManager = new UndoManager({
+  const status = createStatusController(appStatus);
+  const notes = createNotesController({
+    canvas,
+    indicator,
+    invoke,
+    status
+  });
+  const undoManager = new UndoManager({
     getValue:           () => canvas.value,
-    setValue:           (v) => { canvas.value = v; },
+    setValue:           (value) => { canvas.value = value; },
     getSelectionStart:  () => canvas.selectionStart,
     getSelectionEnd:    () => canvas.selectionEnd,
-    setSelection:       (s, e) => { canvas.selectionStart = s; canvas.selectionEnd = e; },
-    getNoteId:          () => notes[currentIndex]?.id ?? null
+    setSelection:       (start, end) => { canvas.selectionStart = start; canvas.selectionEnd = end; },
+    getNoteId:          () => notes.getCurrentNoteId()
+  });
+  notes.setUndoManager(undoManager);
+
+  const themeUi = createThemeUi({
+    dropdownTrigger,
+    dropdownPanel,
+    dropdownLabel,
+    importThemeButton,
+    themeFileInput,
+    status
+  });
+  const settings = createSettingsUi({
+    settingsButton,
+    settingsPanel,
+    shortcutTrigger,
+    shortcutBody
+  });
+  const navigation = createNavigation({
+    canvas,
+    container,
+    notes
+  });
+  const updater = createUpdaterUi({
+    updateBtn,
+    updateVersion,
+    invoke,
+    Channel
+  });
+  const windowControls = createWindowControls({
+    appWindow,
+    closeButton: document.getElementById('btn-close'),
+    maximizeButton: document.getElementById('btn-maximize'),
+    minimizeButton: document.getElementById('btn-minimize'),
+    flushPendingSave: notes.flushPendingSave,
+    status
   });
 
   canvas.disabled = true;
-  canvas.addEventListener('input', scheduleSave);
+  canvas.addEventListener('input', notes.scheduleSave);
   canvas.addEventListener('beforeinput', (e) => undoManager.beforeInput(e));
 
+  themeUi.bind();
+  settings.bind();
+  navigation.bindWheel();
+  updater.bind();
+  windowControls.bind();
+  bindKeyboardShortcuts({
+    document,
+    navigation,
+    notes,
+    settings,
+    undoManager
+  });
+
   try {
-    await initThemes();
-    await loadNotes();
+    await themeUi.init();
+    await notes.init();
   } catch (error) {
     console.error('Startup failed:', error);
-    showStatus('Could not load notes');
+    status.show('Could not load notes');
   } finally {
     canvas.disabled = false;
     canvas.focus();
   }
-
-  settingsButton?.addEventListener('mousedown', (e) => {
-    e.stopPropagation();
-    toggleSettings();
-  });
-
-  importThemeButton?.addEventListener('click', () => themeFileInput.click());
-  themeFileInput?.addEventListener('change', (e) => {
-    const [file] = e.target.files || [];
-    if (file) importThemeFile(file);
-  });
-
-  document.getElementById('btn-minimize')?.addEventListener('mousedown', (e) => {
-    e.stopPropagation();
-    appWindow.minimize();
-  });
-  document.getElementById('btn-maximize')?.addEventListener('mousedown', (e) => {
-    e.stopPropagation();
-    appWindow.toggleMaximize();
-  });
-  document.getElementById('btn-close')?.addEventListener('mousedown', (e) => {
-    e.stopPropagation();
-    closeAfterFlushingSave();
-  });
-
-  appWindow.onCloseRequested(async (event) => {
-    if (closingAfterSave) return;
-    event.preventDefault();
-    await closeAfterFlushingSave();
-  });
 });
