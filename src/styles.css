@@ -1007,3 +1007,18 @@ code {
   color: var(--text-primary);
   font: 500 11px/1.4 'SF Mono', 'SFMono-Regular', ui-monospace, 'Menlo', monospace;
 }
+
+/* ── Shrunk Links ── */
+
+.shrunk-link {
+  color: var(--accent-primary);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+  transition: opacity 0.15s ease;
+}
+
+.shrunk-link:hover {
+  opacity: 0.75;
+}
