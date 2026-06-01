@@ -58,15 +58,15 @@ Both 6-digit hex (`#RRGGBB`) and 8-digit hex with alpha (`#RRGGBBAA`) appear in 
 | `typeSubtle` | Labels / secondary settings text |
 | `typeSubtlePlus` | Stored as CSS var for future use |
 | `typeHighlight` | Text selection highlight and scrollbar thumb |
-| `typeLight` | Placeholder text and quiet UI text |
+| `typeLight` | Placeholder text, quiet UI text, and checked checklist text |
 | `typeSuperlight` | Stored as CSS var for future use |
 | `typeHyperLight` | Hover/surface stub for future UI states |
 | `typeReverse` | Reverse text color, but currently adjusted for button contrast |
 | `accent1Main` | Caret, active note dot, primary settings button |
 | `accent1Secondary` | Stored as CSS var |
 | `accent1Tertiary` | Stored as CSS var |
-| `accent2Main` | Stored as future stub |
-| `accent2Secondary` | Stored as future stub |
+| `accent2Main` | List keyword color and checklist checkbox hover |
+| `accent2Secondary` | Checked checklist checkbox |
 | `accent3Main` | Stored as future stub |
 | `accent3Secondary` | Stored as future stub |
 | `accent4Main` | Stored as future stub |

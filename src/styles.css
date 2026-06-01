@@ -13,6 +13,7 @@
   --theme-accent-secondary: #8f857b;
   --theme-accent-2-main: #b88764;
   --theme-accent-2-secondary: #9d7150;
+  --theme-accent-2-text: #ffffff;
   --theme-danger: #c35c51;
   --theme-control-text: #ffffff;
   --theme-grid-superlight: #00000000;
@@ -350,24 +351,35 @@ html, body {
   padding: 0;
 }
 
+#note-editor .editor-mode-keyword-list {
+  color: var(--theme-accent-2-main);
+}
+
 #note-editor .checklist-box {
-  width: 13px;
-  height: 13px;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
   margin: 0 7px 0 0;
   padding: 0;
-  border: 1.5px solid var(--theme-accent-2-main);
-  border-radius: 3px;
-  background: color-mix(in srgb, var(--theme-accent-2-main) 7%, transparent);
-  color: var(--theme-control-text);
+  border: 1.25px solid var(--theme-type-light);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--theme-accent-2-text);
   cursor: pointer;
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  vertical-align: -2px;
+  font: inherit;
+  line-height: 0;
+  outline: none;
+  vertical-align: -1px;
 }
 
 #note-editor .checklist-box:hover {
-  background: color-mix(in srgb, var(--theme-accent-2-main) 18%, transparent);
+  border-color: var(--theme-accent-2-main);
+  background: color-mix(in srgb, var(--theme-accent-2-main) 12%, transparent);
 }
 
 #note-editor .checklist-box.is-checked {
@@ -379,8 +391,8 @@ html, body {
   content: '';
   width: 6px;
   height: 3px;
-  border-left: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
+  border-left: 1.25px solid currentColor;
+  border-bottom: 1.25px solid currentColor;
   transform: rotate(-45deg) translate(0, -1px);
 }
 

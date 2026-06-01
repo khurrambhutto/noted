@@ -283,6 +283,7 @@ function mapThemeToCss(theme) {
     '--theme-accent-tertiary': theme.accent1Tertiary,
     '--theme-danger': theme.accent5Main,
     '--theme-control-text': readableTextColor(theme.accent1Main, theme),
+    '--theme-accent-2-text': readableTextColor(theme.accent2Secondary, theme),
     '--theme-grid-superlight': theme.gridSuperlight,
     '--theme-grid-clear': theme.gridClear,
     '--theme-grid-bold': theme.gridBold,

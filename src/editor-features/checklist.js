@@ -5,9 +5,9 @@ import { activeEditorModeField } from './mode-detector.js';
 const CHECK_TRIGGER_REGEX = /\s*\/x\s*$/i;
 const HEADING_REGEX = /^#{1,3}(?:\s|$)/;
 
-function isChecklistLine(text, isCursorLine) {
+function isChecklistLine(text) {
   const trimmed = text.trim();
-  if (trimmed === '') return isCursorLine;
+  if (trimmed === '') return true;
   return !trimmed.startsWith('//') && !HEADING_REGEX.test(trimmed);
 }
 
@@ -71,11 +71,12 @@ function toggleChecklistLine(view, lineFrom) {
 
   const trailingWhitespace = line.text.match(/\s*$/)[0].length;
   const insertFrom = line.to - trailingWhitespace;
+  const marker = line.text.trim() === '' ? '/x' : ' /x';
   view.dispatch({
     changes: {
       from: insertFrom,
       to: line.to,
-      insert: ' /x'
+      insert: marker
     }
   });
 }
@@ -84,12 +85,19 @@ function buildChecklistDecorations(view) {
   const builder = new RangeSetBuilder();
   if (view.state.field(activeEditorModeField) !== 'list') return builder.finish();
 
-  const cursorHead = view.state.selection.main.head;
-  const cursorLineNumber = view.state.doc.lineAt(cursorHead).number;
+  const firstLine = view.state.doc.line(1);
+  const keywordStart = firstLine.from + firstLine.text.search(/\S/);
+  if (keywordStart >= firstLine.from) {
+    builder.add(
+      keywordStart,
+      keywordStart + 'list'.length,
+      Decoration.mark({ class: 'editor-mode-keyword editor-mode-keyword-list' })
+    );
+  }
 
   for (let lineNumber = 2; lineNumber <= view.state.doc.lines; lineNumber++) {
     const line = view.state.doc.line(lineNumber);
-    if (!isChecklistLine(line.text, lineNumber === cursorLineNumber)) continue;
+    if (!isChecklistLine(line.text)) continue;
 
     const checked = isCheckedLine(line.text);
     builder.add(
