@@ -470,7 +470,7 @@ body {
 }
 
 #note-editor .editor-mode-keyword-list {
-    color: var(--theme-accent-2-main);
+    color: var(--accent-primary);
     font-size: 16px;
     font-weight: 650;
 }
@@ -517,8 +517,8 @@ body {
 }
 
 #note-editor .checklist-box.is-checked {
-    border-color: var(--theme-accent-2-main);
-    background: var(--theme-accent-2-main);
+    border-color: var(--theme-accent-2-secondary);
+    background: var(--theme-accent-2-secondary);
 }
 
 #note-editor .checklist-box.is-checked::after {
@@ -1321,7 +1321,7 @@ code {
 /* ── Shrunk Links ── */
 
 .shrunk-link {
-    color: var(--accent-primary);
+    color: var(--text-accent);
     cursor: pointer;
     text-decoration: underline;
     text-decoration-style: dotted;

@@ -55,17 +55,17 @@ Both 6-digit hex (`#RRGGBB`) and 8-digit hex with alpha (`#RRGGBBAA`) appear in 
 | `background` | Main app/window background |
 | `backgroundFade` | Settings panel secondary surface / future code block surface |
 | `typeMain` | Main textarea text color |
-| `typeSubtle` | Labels / secondary settings text |
-| `typeSubtlePlus` | Stored as CSS var for future use |
+| `typeSubtle` | Labels / secondary settings text and normal editor links |
+| `typeSubtlePlus` | UI accent text and shortened editor links |
 | `typeHighlight` | Text selection highlight and scrollbar thumb |
 | `typeLight` | Placeholder text, quiet UI text, and checked checklist text |
 | `typeSuperlight` | Stored as CSS var for future use |
 | `typeHyperLight` | Hover/surface stub for future UI states |
 | `typeReverse` | Reverse text color, but currently adjusted for button contrast |
-| `accent1Main` | Caret, active note dot, primary settings button |
+| `accent1Main` | Caret, active note dot, primary settings button, and list keyword color |
 | `accent1Secondary` | Stored as CSS var |
 | `accent1Tertiary` | Stored as CSS var |
-| `accent2Main` | List keyword color and checklist checkbox hover |
+| `accent2Main` | Checklist checkbox hover |
 | `accent2Secondary` | Checked checklist checkbox |
 | `accent3Main` | Stored as future stub |
 | `accent3Secondary` | Stored as future stub |
@@ -109,7 +109,8 @@ Future token mapping:
 | H1 / main keyword / caret | `accent1Main` |
 | H2 / variable assignment | `accent1Secondary` |
 | H3 / variable use | `accent1Tertiary` |
-| List keyword / checkbox hover | `accent2Main` |
+| List keyword / caret | `accent1Main` |
+| Checkbox hover | `accent2Main` |
 | Checked checkbox | `accent2Secondary` |
 | Sum/math total/pinned state | `accent3Main` |
 | Sum secondary/pinned hover | `accent3Secondary` |
