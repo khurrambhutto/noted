@@ -2,6 +2,7 @@ import { StateField, StateEffect } from '@codemirror/state';
 import { Decoration, EditorView, WidgetType } from '@codemirror/view';
 
 const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
+const FULL_URL_REGEX = /^https?:\/\/[^\s<>"{}|\\^`[\]]+$/i;
 const MAX_DISPLAY = 28;
 
 const expandLinkEffect = StateEffect.define();
@@ -108,23 +109,47 @@ function dirtyLineBounds(doc, changes, fromKey, toKey) {
   return { start, end };
 }
 
-function mapExpanded(expanded, changes, transaction) {
+// Expanded links track their text through edits so they stay expanded while the
+// user edits them character by character. Both ends map with assoc 1, which
+// keeps text typed at the end of the URL inside the expanded range.
+function mapExpanded(expanded, changes) {
   const next = new Map();
-  for (const [oldFrom, { to: oldTo, url }] of expanded) {
-    let overlaps = false;
-    for (const { fromA, toA } of changes) {
-      if (oldFrom < toA && oldTo > fromA) {
-        overlaps = true;
-        break;
-      }
-    }
-    if (overlaps) continue;
+  for (const [oldFrom, { to: oldTo }] of expanded) {
     next.set(
-      transaction.changes.mapPos(oldFrom, 1),
-      { to: transaction.changes.mapPos(oldTo, -1), url }
+      changes.mapPos(oldFrom, 1),
+      { to: changes.mapPos(oldTo, 1) }
     );
   }
   return next;
+}
+
+function selectionTouches(selection, from, to) {
+  for (const range of selection.ranges) {
+    if (range.from <= to && range.to >= from) return true;
+  }
+  return false;
+}
+
+// An expanded link stays raw only while the text still reads as a single URL
+// and the selection is still on or next to it. Anything else drops the entry,
+// after which the line rescans and the link shrinks again.
+function reconcileExpanded(expanded, doc, selection) {
+  const next = new Map();
+  const dropped = [];
+  for (const [from, info] of expanded) {
+    const to = info.to;
+    if (from >= to || to > doc.length) {
+      dropped.push(from);
+      continue;
+    }
+    const text = doc.sliceString(from, to);
+    if (!FULL_URL_REGEX.test(text) || !selectionTouches(selection, from, to)) {
+      dropped.push(from);
+      continue;
+    }
+    next.set(from, { to, url: text });
+  }
+  return { expanded: next, dropped };
 }
 
 function createShrunkLinkState(state, expanded = new Map()) {
@@ -186,6 +211,16 @@ function openExternalUrl(url) {
   }
 }
 
+function buildShrunkLinkDecorations(links) {
+  const decos = [];
+  for (const [from, { to, url }] of links) {
+    decos.push(Decoration.replace({
+      widget: new ShrunkLinkWidget(truncateUrl(url), url)
+    }).range(from, to));
+  }
+  return Decoration.set(decos, true);
+}
+
 const shrunkLinksField = StateField.define({
   create(state) {
     return createShrunkLinkState(state);
@@ -208,32 +243,53 @@ const shrunkLinksField = StateField.define({
       }
     }
 
-    if (!transaction.docChanged) return value;
+    if (!transaction.docChanged && value.expanded.size === 0) return value;
 
-    const changes = collectChanges(transaction);
-    if (changes.length === 0) return value;
+    const changes = transaction.docChanged ? collectChanges(transaction) : [];
+    if (transaction.docChanged && changes.length === 0) return value;
 
     const oldDoc = transaction.startState.doc;
     const newDoc = transaction.state.doc;
-    const oldBounds = dirtyLineBounds(oldDoc, changes, 'fromA', 'toA');
-    const newBounds = dirtyLineBounds(newDoc, changes, 'fromB', 'toB');
 
-    const expanded = mapExpanded(value.expanded, changes, transaction);
+    const mapped = transaction.docChanged
+      ? mapExpanded(value.expanded, transaction.changes)
+      : value.expanded;
+    const { expanded, dropped } = reconcileExpanded(mapped, newDoc, transaction.newSelection);
 
-    // Links on untouched lines keep their text, so shift their positions and
-    // keep them. Links on touched lines are dropped and re-discovered below.
-    const links = new Map();
-    for (const [oldFrom, info] of value.links) {
-      const lineNumber = oldDoc.lineAt(oldFrom).number;
-      if (lineNumber >= oldBounds.start && lineNumber <= oldBounds.end) continue;
-      links.set(
-        transaction.changes.mapPos(oldFrom, 1),
-        { to: transaction.changes.mapPos(info.to, -1), url: info.url }
-      );
+    let links;
+    if (changes.length > 0) {
+      const oldBounds = dirtyLineBounds(oldDoc, changes, 'fromA', 'toA');
+      const newBounds = dirtyLineBounds(newDoc, changes, 'fromB', 'toB');
+
+      // Links on untouched lines keep their text, so shift their positions and
+      // keep them. Links on touched lines are dropped and re-discovered below.
+      links = new Map();
+      for (const [oldFrom, info] of value.links) {
+        const lineNumber = oldDoc.lineAt(oldFrom).number;
+        if (lineNumber >= oldBounds.start && lineNumber <= oldBounds.end) continue;
+        links.set(
+          transaction.changes.mapPos(oldFrom, 1),
+          { to: transaction.changes.mapPos(info.to, -1), url: info.url }
+        );
+      }
+
+      for (let lineNumber = newBounds.start; lineNumber <= newBounds.end; lineNumber++) {
+        collectLineLinks(newDoc.line(lineNumber), expanded, links);
+      }
+    } else {
+      links = value.links;
     }
 
-    for (let lineNumber = newBounds.start; lineNumber <= newBounds.end; lineNumber++) {
-      collectLineLinks(newDoc.line(lineNumber), expanded, links);
+    if (dropped.length > 0) {
+      // Lines whose expansion just ended need a rescan so the URL shrinks again.
+      const rescanLines = new Set();
+      for (const pos of dropped) {
+        rescanLines.add(newDoc.lineAt(Math.min(pos, newDoc.length)).number);
+      }
+      links = new Map(links);
+      for (const lineNumber of rescanLines) {
+        collectLineLinks(newDoc.line(lineNumber), expanded, links);
+      }
     }
 
     // Nothing linked before or after: keep the previous state so dependants
@@ -250,17 +306,17 @@ const shrunkLinksField = StateField.define({
     return { links, expanded };
   },
 
+  // Atomic ranges make cursor motion skip a shrunk link and let a single
+  // backspace delete the whole URL instead of one hidden character.
   provide(field) {
-    return EditorView.decorations.compute([field], (state) => {
-      const shrunk = state.field(field).links;
-      const decos = [];
-      for (const [from, { to, url }] of shrunk) {
-        decos.push(Decoration.replace({
-          widget: new ShrunkLinkWidget(truncateUrl(url), url)
-        }).range(from, to));
-      }
-      return Decoration.set(decos, true);
-    });
+    return [
+      EditorView.decorations.compute([field], (state) =>
+        buildShrunkLinkDecorations(state.field(field).links)
+      ),
+      EditorView.atomicRanges.of((view) =>
+        buildShrunkLinkDecorations(view.state.field(field).links)
+      )
+    ];
   }
 });
 
