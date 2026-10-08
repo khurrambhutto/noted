@@ -1,15 +1,15 @@
 {
-  "version": "0.2.2",
+  "version": "0.2.3",
   "notes": "See the release notes for details.",
-  "pub_date": "2026-09-16T20:02:08Z",
+  "pub_date": "2026-10-08T11:32:05Z",
   "platforms": {
     "linux-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRNDJFWnhYUmx4TlVoMkxEdGZIL2RmVnNYTTZFWDU1UEJXbDczeDM5Q051dExBbFQwVmVRNWRNMUMwZG1CVDdNSHovbVM1N0R0QkppTFZ1YVlFSyt6dGMxV3dqVExMRmdJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NTg4OTEwCWZpbGU6bm90ZWRfMC4yLjJfYW1kNjQuZGViClFyNmdxekZPdkk0b2w1S1A2TlZmM3o1SnJTMzlrU0gzS2d5QmpJQUZoelE1Zm1GU1VpQmNRYzRMZ3I1clpZWjVJdm5kTlQvejdNamEvMnZoamNHVURRPT0K",
-      "url": "https://github.com/khurrambhutto/noted/releases/download/v0.2.2/noted_0.2.2_amd64.deb"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRNDJFWnhYUmx4TlJzS0dXVTlZSCs0V2JsNGlnaHRyMXpyQS9yU1dzSnRlZFpUR3dRdFVBSHp0TlNGN3FRdXdLWjV2VEVtSHNWRmUxRlZSU08wSDdFZTVrK2JVVkdJTUFFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNDU5MTAyCWZpbGU6bm90ZWRfMC4yLjNfYW1kNjQuZGViCnZoNmNZM3VrM2R6ZGxiQjRjR2lUZ3VTaUVzbGZCL3lJcHhQMVFEa0xCbXY3RE5FaFVNZDFkRXF4OXBXNDhtOXpaNTcwVDVYSkVuWUszUFBDMThuWEJ3PT0K",
+      "url": "https://github.com/khurrambhutto/noted/releases/download/v0.2.3/noted_0.2.3_amd64.deb"
     },
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRNDJFWnhYUmx4TlVuT2c4YU8yZU1BbFlxQ3lvcmVmTTVKdzFTYjFLb0Jsa2pkMDZKN2FhMnNkRW4wbEl1eTlaQ21GVk5GcTJNUXVOMTB3akNoSkl1Uk9rQm1KaTMwU2djPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NTg4ODc2CWZpbGU6bm90ZWRfMC4yLjJfeDY0X2VuLVVTLm1zaQpYRlZXQjZMQ2MycmptZitubTI2eXNnd0EvdmZVRTZmRm1FUWNZelFKWkpZYWwxcFFCL2FiN1lubFdCbkhoRnBkQW93VmtnU0RCNXZlUWlxRmxJU2hEZz09Cg==",
-      "url": "https://github.com/khurrambhutto/noted/releases/download/v0.2.2/noted_0.2.2_x64_en-US.msi"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRNDJFWnhYUmx4TmRPTVdZVHozSFM1MjRrb0tZOW43M3IydERCeGVYM2RZQzR3b2I1d0sweXJqWm9tQVYrWXdneFJiK3RXZ285MC96OWhOeUExZWYvZGVsMWV6bStVSVE0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxNDU4OTgwCWZpbGU6bm90ZWRfMC4yLjNfeDY0X2VuLVVTLm1zaQpWOStRUFI2ZGllNmF0ZlRGWnU0bFRJcFpmcE5BNDVBZXZrUGpMdlhOdVg3ZHNGWDNmblNkd3dhekRRR2FJT21HdzdyR2hMQ0VEL3pYeU9GNjJvalZDdz09Cg==",
+      "url": "https://github.com/khurrambhutto/noted/releases/download/v0.2.3/noted_0.2.3_x64_en-US.msi"
     }
   }
 }
