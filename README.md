@@ -145,7 +145,7 @@ uploads them to the GitHub release, and generates the release `latest.json`.
 Before tagging, bump the app version in source metadata and run:
 
 ```bash
-npm run validate:release -- --version=v0.2.2
+npm run validate:release -- --version=v0.2.3
 npm run build:frontend
 cargo check --manifest-path src-tauri/Cargo.toml
 cargo test --manifest-path src-tauri/Cargo.toml
@@ -154,9 +154,9 @@ cargo test --manifest-path src-tauri/Cargo.toml
 Then publish:
 
 ```bash
-git tag v0.2.2
+git tag v0.2.3
 git push origin main
-git push origin v0.2.2
+git push origin v0.2.3
 ```
 
 The repository must have these secrets configured for signed updater artifacts:
