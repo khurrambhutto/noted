@@ -23,6 +23,11 @@
             <path d="M15 6C15 6 9.00001 10.4189 9 12C8.99999 13.5812 15 18 15 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
+        <button id="btn-links" title="Links" aria-label="Open Links" aria-pressed="false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
         <div id="window-controls">
           <button id="btn-pin" title="Unpin from top" aria-label="Unpin from top" aria-pressed="false" hidden>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -43,6 +48,32 @@
       <div id="canvas-container">
         <div id="note-editor" aria-label="Note editor"></div>
       </div>
+      <section id="links-panel" aria-label="Saved links" hidden>
+        <div class="links-heading">
+          <h2>Links</h2>
+          <button id="links-add" type="button">+ Add links</button>
+        </div>
+        <label class="links-search-label">
+          <span class="links-sr-only">Search links</span>
+          <input id="links-search" type="search" placeholder="Search by name or URL" autocomplete="off" />
+        </label>
+        <form id="links-add-form" hidden>
+          <label for="links-input">Paste URLs, one per line</label>
+          <textarea id="links-input" rows="3" spellcheck="false"></textarea>
+          <div class="links-form-actions">
+            <button type="submit">Save links</button>
+            <button id="links-cancel" type="button">Cancel</button>
+          </div>
+        </form>
+        <div class="links-scroll">
+          <ul id="links-list"></ul>
+          <button id="links-more" type="button" hidden>Load more</button>
+        </div>
+        <div class="links-footer">
+          <span id="links-count" role="status" aria-live="polite"></span>
+          <button id="links-back" type="button">Back to note</button>
+        </div>
+      </section>
       <div id="note-indicator"></div>
       <div id="app-status" role="status" aria-live="polite"></div>
       <aside id="settings-panel" class="hidden" aria-hidden="true">
@@ -68,6 +99,15 @@
               <button id="btn-import-theme">Import Theme</button>
             </div>
             <input id="theme-file-input" type="file" accept=".json,application/json"hidden />
+          </div>
+          <div class="settings-section">
+            <div class="settings-section-row">
+              <h3 class="settings-section-title">Fetch page titles</h3>
+              <button class="switch" id="fetch-link-titles" role="switch" aria-checked="false" aria-label="Fetch page titles automatically" aria-describedby="link-titles-description" disabled>
+                <span class="switch-thumb" aria-hidden="true"></span>
+              </button>
+            </div>
+            <p class="links-setting-description" id="link-titles-description">Contacts saved websites to get their titles. Links are saved even when offline.</p>
           </div>
           <div class="settings-section" id="pin-section" hidden>
             <div class="settings-section-row">

@@ -95,6 +95,14 @@ export function createEditorController({
     });
   }
 
+  function consumeLineCommand(command) {
+    const selection = view.state.selection.main;
+    const line = view.state.doc.lineAt(selection.head);
+    if (!selection.empty || line.text.trim() !== command) return false;
+    view.dispatch({ changes: { from: line.from, to: line.to, insert: '' } });
+    return true;
+  }
+
   function getSelection() {
     const selection = view.state.selection.main;
     return {
@@ -125,6 +133,7 @@ export function createEditorController({
 
   return {
     applyTransition,
+    consumeLineCommand,
     focus: () => view.focus(),
     getCursorLine: () => view.state.doc.lineAt(view.state.selection.main.head).number,
     getMode: () => view.state.field(activeEditorModeField),

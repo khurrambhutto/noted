@@ -1,3 +1,4 @@
+import { createLinksController } from './links-controller.js';
 import { bindKeyboardShortcuts } from './keyboard-shortcuts.js';
 import { createEditorController } from './editor-controller.js';
 import { createNavigation } from './navigation.js';
@@ -60,10 +61,24 @@ window.addEventListener('DOMContentLoaded', async () => {
     shortcutTrigger,
     shortcutBody
   });
-  const navigation = createNavigation({
+  let ready = false;
+  let navigation;
+  const links = createLinksController({
+    panel: document.getElementById('links-panel'),
+    openButton: document.getElementById('btn-links'),
+    editor,
+    notes,
+    settings,
+    invoke,
+    status,
+    canOpen: () => ready && !navigation.isBusy()
+  });
+  navigation = createNavigation({
     editor,
     container,
-    notes
+    notes,
+    status,
+    canNavigate: () => ready && !links.isActive() && document.documentElement.dataset.settings !== 'open'
   });
   const updater = createUpdaterUi({
     updateBtn,
@@ -82,7 +97,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     closeButton: document.getElementById('btn-close'),
     maximizeButton: document.getElementById('btn-maximize'),
     minimizeButton: document.getElementById('btn-minimize'),
-    flushPendingSave: notes.flushPendingSave,
+    flushPendingSave: async () => {
+      await notes.flushPendingSave();
+      await links.flushPendingWrites();
+    },
     invoke,
     status
   });
@@ -91,6 +109,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   editor.setDisabled(true);
   editor.onChange(notes.scheduleSave);
 
+  links.bind();
   themeUi.bind();
   settings.bind();
   navigation.bindWheel();
@@ -103,16 +122,16 @@ window.addEventListener('DOMContentLoaded', async () => {
     editor,
     navigation,
     notes,
-    settings
+    settings,
+    links
   });
 
-  try {
-    await Promise.all([themeUi.init(), notes.init(), pin.init()]);
-  } catch (error) {
-    console.error('Startup failed:', error);
+  const startup = await Promise.allSettled([notes.init(), themeUi.init(), pin.init(), links.init()]);
+  ready = startup[0].status === 'fulfilled';
+  if (!ready) {
+    console.error('Could not load notes:', startup[0].reason);
     status.show('Could not load notes');
-  } finally {
-    editor.setDisabled(false);
-    editor.focus();
   }
+  editor.setDisabled(!ready);
+  editor.focus();
 });

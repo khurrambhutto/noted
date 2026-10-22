@@ -4,50 +4,50 @@ const GESTURE_TIMEOUT = 200;
 export function createNavigation({
   editor,
   container,
-  notes
+  notes,
+  status,
+  canNavigate = () => true
 }) {
   let animating = false;
+  let navigating = false;
   let accumulatedX = 0;
   let gestureTimer = null;
   let gestureLocked = false;
 
-  async function slideToNext() {
-    if (animating) return;
-
-    const deleted = await notes.deleteIfEmpty();
-
-    if (deleted) {
-      await animateSwap('slide-left-out', 'slide-left-in', notes.getCurrentDocument());
+  async function navigate(direction) {
+    if (navigating || !canNavigate() || (direction === 'prev' && notes.isAtFirstNote())) return;
+    // Lock before the first save so opening Links cannot race a note switch.
+    navigating = true;
+    try {
+      const deleted = await notes.deleteIfEmpty();
+      let nextDocument = notes.getCurrentDocument();
+      if (!deleted) {
+        nextDocument = direction === 'next'
+          ? await (notes.isAtLastNote() ? notes.appendNoteAfterSave() : notes.moveToNextAfterSave())
+          : await notes.moveToPrevAfterSave();
+      }
+      const side = direction === 'next' ? 'left' : 'right';
+      await animateSwap(`slide-${side}-out`, `slide-${side}-in`, nextDocument);
       notes.updateIndicator();
-      return;
+    } catch (error) {
+      console.error('Navigation failed:', error);
+      status.show('Could not switch notes');
+    } finally {
+      navigating = false;
     }
-
-    const newDocument = notes.isAtLastNote()
-      ? await notes.appendNoteAfterSave()
-      : await notes.moveToNextAfterSave();
-
-    await animateSwap('slide-left-out', 'slide-left-in', newDocument);
-    notes.updateIndicator();
   }
 
-  async function slideToPrev() {
-    if (animating || notes.isAtFirstNote()) return;
+  function slideToNext() {
+    return navigate('next');
+  }
 
-    const deleted = await notes.deleteIfEmpty();
-
-    if (deleted) {
-      await animateSwap('slide-right-out', 'slide-right-in', notes.getCurrentDocument());
-      notes.updateIndicator();
-      return;
-    }
-
-    const newDocument = await notes.moveToPrevAfterSave();
-    await animateSwap('slide-right-out', 'slide-right-in', newDocument);
-    notes.updateIndicator();
+  function slideToPrev() {
+    return navigate('prev');
   }
 
   function bindWheel() {
     container.addEventListener('wheel', (e) => {
+      if (!canNavigate()) return;
       if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
 
       e.preventDefault();
@@ -106,6 +106,7 @@ export function createNavigation({
 
   return {
     bindWheel,
+    isBusy: () => navigating,
     slideToNext,
     slideToPrev
   };
