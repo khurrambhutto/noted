@@ -15,6 +15,7 @@
     "core:window:allow-set-focus",
     "core:window:allow-is-visible",
     "opener:default",
+    "clipboard-manager:allow-read-text",
     "process:allow-restart",
     "updater:default",
     "updater:allow-check",

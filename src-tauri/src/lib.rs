@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use tauri::Manager;
 
 mod db;
+mod links;
 
 #[derive(Clone)]
 struct AppPaths {
@@ -145,6 +146,74 @@ fn save_note(
 #[tauri::command]
 fn delete_note(id: i64, state: tauri::State<'_, db::Database>) -> Result<(), String> {
     state.delete_note(id)
+}
+
+#[tauri::command]
+fn list_links(
+    query: String,
+    offset: i64,
+    state: tauri::State<'_, db::Database>,
+) -> Result<links::LinkPage, String> {
+    state.list_links(&query, offset)
+}
+
+#[tauri::command]
+fn add_links(
+    text: String,
+    state: tauri::State<'_, db::Database>,
+) -> Result<links::AddLinksResult, String> {
+    state.add_links(&text)
+}
+
+#[tauri::command]
+fn rename_link(
+    id: i64,
+    label: String,
+    state: tauri::State<'_, db::Database>,
+) -> Result<(), String> {
+    state.rename_link(id, &label)
+}
+
+#[tauri::command]
+fn delete_link(id: i64, state: tauri::State<'_, db::Database>) -> Result<(), String> {
+    state.delete_link(id)
+}
+
+#[tauri::command]
+fn pending_link_titles(state: tauri::State<'_, db::Database>) -> Result<Vec<i64>, String> {
+    if !state.fetch_link_titles_enabled()? {
+        return Ok(Vec::new());
+    }
+    state.pending_link_titles()
+}
+
+#[tauri::command]
+fn get_fetch_link_titles(state: tauri::State<'_, db::Database>) -> Result<bool, String> {
+    state.fetch_link_titles_enabled()
+}
+
+#[tauri::command]
+fn set_fetch_link_titles(
+    enabled: bool,
+    state: tauri::State<'_, db::Database>,
+) -> Result<(), String> {
+    state.set_fetch_link_titles(enabled)
+}
+
+#[tauri::command]
+async fn refresh_link_title(
+    id: i64,
+    state: tauri::State<'_, db::Database>,
+    fetcher: tauri::State<'_, links::TitleFetcher>,
+) -> Result<links::SavedLink, String> {
+    if !state.fetch_link_titles_enabled()? {
+        return Err("Page title fetching is turned off.".into());
+    }
+    let link = state.get_link(id)?;
+    let result = fetcher.fetch(&link.url).await;
+    state.set_link_title(id, result.as_ref().ok().map(String::as_str))?;
+    result?;
+    state.get_link(id)
 }
 
 #[tauri::command]
@@ -457,6 +526,7 @@ pub fn run() {
 
     builder
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
@@ -471,6 +541,7 @@ pub fn run() {
 
             let database = db::Database::new(app_data_dir).expect("failed to initialize database");
             app.manage(database);
+            app.manage(links::TitleFetcher::new());
             app.manage(AppPaths { themes_dir });
             #[cfg(desktop)]
             register_global_hotkey();
@@ -483,6 +554,14 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            list_links,
+            add_links,
+            rename_link,
+            delete_link,
+            pending_link_titles,
+            get_fetch_link_titles,
+            set_fetch_link_titles,
+            refresh_link_title,
             list_notes,
             create_note,
             save_note,

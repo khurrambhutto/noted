@@ -32,6 +32,7 @@ stays lightweight enough to use as an always-available scratchpad.
 - Swipe and keyboard navigation through a stack of notes.
 - Linux global toggle shortcut through `noted-toggle` and DBus single-instance activation.
 - Shortened link display inside the editor, with click-to-open behavior.
+- A searchable Links collection with clipboard capture and optional page titles.
 - Antinote-compatible JSON theme import with persisted theme files.
 - Built-in updater support for signed release artifacts.
 - Small Tauri desktop shell for Linux and Windows.
@@ -60,6 +61,29 @@ Use noted as a temporary note stack:
 - Use the note indicator at the bottom to understand your position in the stack.
 - Open settings to switch or import themes.
 - Paste full URLs normally; noted will display long links in a compact form.
+
+### Saved links
+
+Keep URLs in a dedicated Links collection outside your note stack:
+
+- Open Links with the link button in the title bar, `Ctrl+Shift+L`, or by typing
+  `/links` on a line by itself and pressing Enter.
+- Press `Ctrl+Shift+V` while noted is focused to save URLs from the clipboard
+  without leaving your note. Regular `Ctrl+V` still pastes into the focused editor
+  or input.
+- Use **Add links** to paste up to 1,000 HTTP/HTTPS URLs at once, one per line.
+  Duplicate URLs are skipped.
+- Search by name or URL. Each link's menu offers rename, refresh title, and
+  remove. Clear a custom name to use the fetched title again.
+- Press Escape or **Back to note** to return to your note and cursor position.
+
+Links save locally before page titles are fetched. Automatic title fetching is
+on by default and contacts the saved websites directly. Turn off **Fetch page
+titles** in Settings to save links without making those requests. Existing
+requests may finish after the setting is turned off. Titles are cached locally;
+failed requests fall back to the domain and can be retried from the link menu.
+Login-only pages, pages requiring JavaScript, and local network addresses may
+need a custom name. Names you choose are preserved when titles refresh.
 
 ### Linux Global Shortcut
 
@@ -109,6 +133,7 @@ npm run tauri -- dev
 
 ```bash
 npm run build:frontend
+npm run test:frontend
 npm run check:rust
 npm run test:rust
 npm run tauri -- build
@@ -131,6 +156,7 @@ Before opening a PR, run the relevant checks:
 
 ```bash
 npm run build:frontend
+npm run test:frontend
 npm run check:rust
 npm run test:rust
 ```
